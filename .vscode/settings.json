@@ -1,7 +1,7 @@
 {
     "editor.fontSize" : 12,
-    "window.zoomLevel" : 1,
-    "terminal.integrated.fontSize": 14,
+    "window.zoomLevel" : 0,
+    "terminal.integrated.fontSize": 12,
     "workbench.colorTheme" :"Noctis Azureus",
     "workbench.iconTheme" : "vscode-icons",
 }
