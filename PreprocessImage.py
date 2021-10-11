@@ -1,17 +1,20 @@
 from tkinter import *
+import subprocess
 import cv2
 import os
+import re
 import math
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.ndimage import interpolation as inter
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilename, askopenfilenames
 from tkinter.filedialog import asksaveasfile
 import pytesseract
 
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\Tesseract.exe"
 root = Tk()
 root.title("Image Preprocessing")
+root.geometry('400x400')
 
 # Initialization
 result_norm_planes = []
@@ -122,6 +125,11 @@ def warp_affine(angle, image):
     (h, w) = image.shape[:2]
     center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    print("height = " + str(h))
+    print("width = " + str(w))
+    print("center = " + str(center))
+    print("M = ")
+    print(M)
     rotated = cv2.warpAffine(image, M, (w, h),
         flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REPLICATE)
 
@@ -134,18 +142,20 @@ def warp_affine(angle, image):
     return rotated
 
 def rotate_skewed_right(angle, image):
-    if angle < 0:
+    if angle < -45:
         angle = -(90 + angle)
         angle = 180 + (angle - 90)
     else:
         angle = -(angle)
         angle = 180 + (angle - 90)
     # rotate the image to deskew it
+    print("new angle = ")
+    print(angle)
     rotated_image = warp_affine(angle,image)
     return rotated_image
 
 def rotate_skewed_left(angle, image):
-    if angle < 0:
+    if angle < -45:
         angle = -(90 + angle)
     else:
         angle = -(angle)
@@ -252,11 +262,11 @@ def preprocess_skewed(image, denoised):
     width_smallest_height = []
     for index, val in np.ndenumerate(black_coords[:,0]):
         if val == smallest_coords_height:
-            print("\nNilai height terendah = ")
-            print(black_coords[index,0])
+            #print("\nNilai height terendah = ")
+            #print(black_coords[index,0])
 
-            print("\nNilai width pada height terendah = ")
-            print(black_coords[index,1])
+            #print("\nNilai width pada height terendah = ")
+            #print(black_coords[index,1])
             width_smallest_height.append(black_coords[index,1])
 
     wsh = np.concatenate(width_smallest_height)
@@ -267,11 +277,11 @@ def preprocess_skewed(image, denoised):
     width_largest_height = []
     for index, val in np.ndenumerate(black_coords[:,0]):
         if val == largest_coords_height:
-            print("\nNilai height tertinggi = ")
-            print(black_coords[index,0])
+            #print("\nNilai height tertinggi = ")
+            #print(black_coords[index,0])
 
-            print("\nNilai width pada height tertinggi = ")
-            print(black_coords[index,1])
+            #print("\nNilai width pada height tertinggi = ")
+            #print(black_coords[index,1])
             width_largest_height.append(black_coords[index,1])
 
     wlh = np.concatenate(width_largest_height)
@@ -282,11 +292,11 @@ def preprocess_skewed(image, denoised):
     height_smallest_width = []
     for index, val in np.ndenumerate(black_coords[:,1]):
         if val == smallest_coords_width:
-            print("\nNilai width terendah = ")
-            print(black_coords[index,1])
+            #print("\nNilai width terendah = ")
+            #print(black_coords[index,1])
 
-            print("\nNilai height pada width terendah = ")
-            print(black_coords[index,0])
+            #print("\nNilai height pada width terendah = ")
+            #print(black_coords[index,0])
             height_smallest_width.append(black_coords[index,0])
 
     hsw = np.concatenate(height_smallest_width)
@@ -297,11 +307,11 @@ def preprocess_skewed(image, denoised):
     height_largest_width = []
     for index, val in np.ndenumerate(black_coords[:,1]):
         if val == largest_coords_width:
-            print("\nNilai width tertinggi = ")
-            print(black_coords[index,1])
+            # print("\nNilai width tertinggi = ")
+            # print(black_coords[index,1])
 
-            print("\nNilai height pada width tertinggi = ")
-            print(black_coords[index,0])
+            # print("\nNilai height pada width tertinggi = ")
+            # print(black_coords[index,0])
             height_largest_width.append(black_coords[index,0])
 
     hlw = np.concatenate(width_largest_height)
@@ -312,30 +322,20 @@ def preprocess_skewed(image, denoised):
     height = largest_coords_height - smallest_coords_height
     print(width)
     print(height)
-    if angle != 0:
+    print("Angle : " + str(angle))
+    if 1 < angle < 88:
         if hsw_largest > hlw_largest:
-            if angle < 0:
-                angle = -(90 + angle)
-                angle = 180 + (angle - 90)
-            else:
-                angle = -(angle)
-                angle = 180 + (angle - 90)
+            image = rotate_skewed_right(angle, image)
         elif hsw_largest < hlw_largest:
-            if angle < -45:
-                angle = -(90 + angle)
-            else:
-                angle = -angle
-
-    print(angle)
-    # Rotate image to deskew
-    (h, w) = image.shape[:2]
-    center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    image = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-
+            image = rotate_skewed_left(angle, image)
+    else:
+        if width > height:
+            image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
     
-
-    '''white_coords_rot = np.column_stack(np.where(img_thresh == 255))
+    '''thresh_rot = cv2.threshold(image, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    cv2.imshow('thresh rot', thresh_rot)
+    cv2.waitKey(0)
+    white_coords_rot = np.column_stack(np.where(thresh_rot < 50))
     smallest_coords_height_rot = np.amin(white_coords_rot[:,0])
     smallest_coords_height_str_rot = str(smallest_coords_height_rot)
     print("\nSmallest white coordinate height = " + smallest_coords_height_str_rot)
@@ -353,77 +353,63 @@ def preprocess_skewed(image, denoised):
     print("\nLargest white coordinates width = " + largest_coords_width_str_rot)
 
     # Cut image image  [height, width]
-    cut_image = img_thresh[(smallest_coords_height_rot - 10):(largest_coords_height_rot + 10), (smallest_coords_width_rot - 10):(largest_coords_width_rot + 10)]'''
-    #cv2.imshow("rotated", rotated)
+    if smallest_coords_height_rot <= 1:
+        cropped_image = image[(smallest_coords_height_rot):(largest_coords_height_rot + 5), (smallest_coords_width_rot - 5):(largest_coords_width_rot + 5)]
+        cv2.imshow("cropped image", cropped_image)
+    else:
+        cropped_image = image[(smallest_coords_height_rot - 5):(largest_coords_height_rot + 5), (smallest_coords_width_rot - 5):(largest_coords_width_rot + 5)]
+        cv2.imshow("cropped image", cropped_image)
+    cv2.waitKey(0)'''
     return image
-    #return cut_image
-    # rotated_image = rotate_skewed_horizontal_left(image)
-    # rotated_image = rotate_skewed_horizontal_right(image)
-    # rotated_image = rotate_skewed_left_upside_down(angle, image)
-    # rotated_image = rotate_skewed_right_upside_down(angle, image)
-    # rotated_image = rotate_upside_down(image)
 
-def getAngle(image) -> float:
-    newImage = image.copy()
-    gray = cv2.cvtColor(newImage, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (9, 9), 0)
-    thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+def check_orientation_layout(image, osd_rotate_angle):
+    if osd_rotate_angle == 90:
+        image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    elif osd_rotate_angle == 270:
+        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+    elif osd_rotate_angle == 180:
+        image = rotate_upside_down(image)
+    return image
+    print('ini adalah fungsi pengecekan apakah dokumen tersebut portrait atau landscape')
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (30,5))
-    dilate = cv2.dilate(thresh, kernel, iterations=2)
-
-    contours, hierarchy = cv2.findContours(dilate, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    contours = sorted (contours, key = cv2. contourArea, reverse=True)
-    for c in contours:
-        rect = cv2.boundingRect(c)
-        x, y, w, h = rect
-        cv2.rectangle(newImage, (x,y), (x+w, y+h), (0,255,0), 2)
-
-    largestContour = contours[0]
-    print(len(contours))
-    minAreaRect = cv2.minAreaRect(largestContour)
-    cv2.imwrite("Resources/test.jpg", newImage)
-    angle =minAreaRect[-1]
-    angle = 180 - (angle + 90)
-    print(angle)
-    if angle < -45:
-        angle = 90 + angle
-    return -1.0 * angle
-
-def rotateImage(image, angle: float):
-    newImage = image.copy()
-    (h, w) = newImage.shape[:2]
-    center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    newImage = cv2.warpAffine(newImage, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-    return newImage
-
-def deSkew():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("PNG Files", "*.png"), ("JPEG Files", "*.jpg")))
-    image = cv2.imread(root.file)
-    angle = getAngle(image)
-    result = rotateImage(image, angle)
-    plt.subplot(121),plt.imshow(image),plt.title('Original')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(122),plt.imshow(result),plt.title('Result')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
 #======================================================================= OCR Test =======================================================================================$
 def ocr_test():
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\Tesseract.exe"
+    # open and ocr
     root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png")))
     img = cv2.imread(root.file)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     adaptive_threshold = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 91, 11)
     text = pytesseract.image_to_string(adaptive_threshold)
-    print(text)
+
+    # save to the file and open it
+    name, extension = os.path.splitext(root.file)
+    file_name = os.path.split(name)[1]
+    string = root.file
+
+    osd = re.search('(?<=Rotate: )\d+', pytesseract.image_to_osd(string,config='--psm 0 -c min_characters_to_try=5')).group(0)
+    print("root file = " + string)
+    print("file name = " + file_name)
+    print("Sudut = " + str(osd))
+    folder = 'ocr_test_result/'
+    save_file_name = folder + file_name + '_ocr_result.txt'
+
+    with open(save_file_name, 'w') as f:
+        f.write(text)
     
+    print("Dibawah ini merupakan hasil open file text\n")
+    with open(save_file_name, 'r') as f:
+        isi = f.read()
+        print(isi)
+    
+
 
 #=======================================================================Preprocessing untuk auto-cropped=================================================================#
 def preprocess_autocropped(image):
-    gray_rot = cv2.bitwise_not(image)
-    thresh_rot = cv2.threshold(gray_rot, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    # gray_rot = cv2.bitwise_not(image)
+    thresh_rot = cv2.threshold(image, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
     cv2.imshow('thresh rot', thresh_rot)
+    cv2.waitKey(0)
     white_coords_rot = np.column_stack(np.where(thresh_rot == 255))
     smallest_coords_height_rot = np.amin(white_coords_rot[:,0])
     smallest_coords_height_str_rot = str(smallest_coords_height_rot)
@@ -442,7 +428,7 @@ def preprocess_autocropped(image):
     print("\nLargest white coordinates width = " + largest_coords_width_str_rot)
 
     # Cut image image  [height, width]
-    cropped_image = image[(smallest_coords_height_rot - 10):(largest_coords_height_rot + 10), (smallest_coords_width_rot - 10):(largest_coords_width_rot + 10)]
+    cropped_image = image[(smallest_coords_height_rot):(largest_coords_height_rot), (smallest_coords_width_rot):(largest_coords_width_rot)]
     return cropped_image
 
 #=======================================================================Preprocessing untuk foto=========================================================================#
@@ -462,7 +448,6 @@ def preprocess_photos():
     image = cv2.resize(image, (columns, rows))
     # Melakukan pointing posisi dengan event mouse click
     while True:
-        
         if counter == 4:
             point1 = arrayPoints[1, 0] - arrayPoints[0, 0]
             point2 = arrayPoints[3, 1] - arrayPoints[0, 1]
@@ -499,108 +484,50 @@ def preprocess_photos():
 
 #==========================================================================Add noise Functions========================================================================#
 def salt_and_pepper():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png")))
-    name, extension = os.path.splitext(root.file)
-    file_name = os.path.split(name)[1]
-    img = cv2.imread(root.file)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    row,col,ch = img.shape
+    root.file = askopenfilenames(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png")))
+    last_index = len(root.file)
+    for index in range(0, last_index):
+        name, extension = os.path.splitext(root.file[index])
+        file_name = os.path.split(name)[1]
+        img = cv2.imread(root.file[index])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        row,col,ch = img.shape
 
-    s_vs_p = 0.5
-    amount = 0.004
-    out = np.copy(img)
+        s_vs_p = 0.5
+        amount = 0.004
+        out = np.copy(img)
 
-    # Salt mode
-    num_salt = np.ceil(amount * img.size * s_vs_p)
-    coords = [np.random.randint(0, i - 1, int (num_salt))
-            for i in img.shape]
-    out[coords] = 1
+        # Salt mode
+        num_salt = np.ceil(amount * img.size * s_vs_p)
+        coords = [np.random.randint(0, i - 1, int (num_salt))
+                for i in img.shape]
+        out[coords] = 1
 
-    # Pepper mode
-    num_pepper = np.ceil(amount* img.size * (1. - s_vs_p))
-    coords = [np.random.randint(0, i - 1, int(num_pepper))
-            for i in img.shape]
-    out[coords] = 0
+        # Pepper mode
+        num_pepper = np.ceil(amount* img.size * (1. - s_vs_p))
+        coords = [np.random.randint(0, i - 1, int(num_pepper))
+                for i in img.shape]
+        out[coords] = 0
 
-    save_file_name = 'Resources/salt_and_pepper/' + file_name + '_s&p' + extension
-    print("Save file path = ", save_file_name)
-    cv2.imwrite(save_file_name, out)
-
-    plt.subplot(121),plt.imshow(img),plt.title('Original')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(122),plt.imshow(out),plt.title('S&P Noise')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
+        save_file_name = 'Resources/salt_and_pepper_multi/' + file_name + '_s&p' + extension
+        print("Save file path = ", save_file_name)
+        cv2.imwrite(save_file_name, out)
 
 def gaussian_noise():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png")))
-    name, extension = os.path.splitext(root.file)
-    file_name = os.path.split(name)[1]
-
-    img = cv2.imread(root.file)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    gauss = np.random.normal(0,1,img.size)
-    gauss = gauss.reshape(img.shape[0],img.shape[1],img.shape[2]).astype('uint8')
-    # Add the Gaussian noise to the image
-    img_gauss = cv2.add(img,gauss)
-
-    save_file_name = 'Resources/gaussian/' + file_name + '_gauss' + extension
-    print("Save file path = ", save_file_name)
-    cv2.imwrite(save_file_name, img_gauss)
-
-    plt.subplot(121),plt.imshow(img),plt.title('Original')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(122),plt.imshow(img_gauss),plt.title('Gaussian Noise')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
-
-def Poisson():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("PNG Files", "*.png"), ("JPEG Files", "*.jpg")))
-    img = cv2.imread(root.file)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    gauss = np.random.poisson(1,img.size)
-    gauss = gauss.reshape(img.shape[0],img.shape[1],img.shape[2]).astype('uint8')     
-    noisy = img + (img * gauss)
-    cv2.imwrite('Resources/01_p.png',noisy)
-    plt.subplot(121),plt.imshow(img),plt.title('Original')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(122),plt.imshow(noisy),plt.title('Poisson Noise')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
-
-def speckle():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("PNG Files", "*.png"), ("JPEG Files", "*.jpg")))
-    img = cv2.imread(root.file)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    gauss = np.random.normal(0,1,img.size)
-    gauss = gauss.reshape(img.shape[0],img.shape[1],img.shape[2]).astype('uint8')     
-    noisy = img + (img * gauss)
-    cv2.imwrite('Resources/01_s.png',noisy)
-    plt.subplot(121),plt.imshow(img),plt.title('Original')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(122),plt.imshow(noisy),plt.title('Speckle Noise')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
-
-def estimate_noise(image):
-    (H, W) = image.shape
-
-    M = [[1, -2, 1],
-        [-2, 4, -2],
-        [1, -2, 1]]
-
-    sigma = np.sum(np.sum(np.absolute(convolve2d(image, M))))
-    sigma = sigma * math.sqrt(0.5 * math.pi) / (6 * (W-2) * (H-2))
-
-    return sigma
-
-def detect_noise():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("PNG Files", "*.png"), ("JPEG Files", "*.jpg")))
-    img = cv2.imread(root.file)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    edges = cv2.Canny(img, 100, 200)
-    total = estimate_noise(edges)
-    print('total = ',total)
+    root.file = askopenfilenames(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png")))
+    last_index = len(root.file)
+    for index in range(0, last_index):
+        name, extension = os.path.splitext(root.file[index])
+        file_name = os.path.split(name)[1]
+        img = cv2.imread(root.file[index])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        gauss = np.random.normal(0,1,img.size)
+        gauss = gauss.reshape(img.shape[0],img.shape[1],img.shape[2]).astype('uint8')
+        # Add the Gaussian noise to the image
+        img_gauss = cv2.add(img,gauss)
+        save_file_name = 'Resources/gaussian/' + file_name + '_gauss' + extension
+        print("Save file path = ", save_file_name)
+        cv2.imwrite(save_file_name, img_gauss)
 
 #============================================================================Edge Detection=============================================================================#
 def canny():
@@ -651,7 +578,7 @@ def sobel():
     plt.subplot(133),plt.imshow(filtered_image_y,cmap = 'gray')
     plt.title('Sobel y'), plt.xticks([]), plt.yticks([])
     plt.show()
-#====================================================================Count Noises Function=======================================================================#
+#==============================================================Count Noises Function=========================================================#
 def count_noise(image):
     image_gray = image.copy()
     image_gray = cv2.cvtColor(image_gray, cv2.COLOR_BGR2GRAY)
@@ -660,6 +587,7 @@ def count_noise(image):
     range_columns = columns - 1
     count = 0
     thresh = cv2.threshold(image_gray, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    #cv2.imshow('thresh', thresh)
     for index in range(0, range_rows):
         for index_2 in range(0, range_columns):
             if thresh[index, index_2] < 255:
@@ -671,29 +599,113 @@ def count_noise(image):
     
 #====================================================================Start Preprocessing Function=======================================================================#
 def start_preprocessing():
-    root.file = askopenfilename(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png"), ("JPEG Files", "*.jpeg")))
-    name, extension = os.path.splitext(root.file)
-    file_name = os.path.split(name)[1]
-    image = cv2.imread(root.file)
-    cv2.imshow('before', image)
-    # Validasi untuk denoise
-    total_noise = count_noise(image)
-    denoised = 0
-    if(total_noise > 50):
-        image = preprocessing_denoise(image)
-        denoised = 1
+    root.file = askopenfilenames(initialdir = "", title = "Choose Document", filetypes=(("JPG Files", "*.jpg"), ("PNG Files", "*.png"), ("JPEG Files", "*.jpeg")))
+    last_index = len(root.file)
+    iterate = 0
+    for index in range(0, last_index):
+        print("test")
+        name, extension = os.path.splitext(root.file[index])
+        file_name = os.path.split(name)[1]
+        image = cv2.imread(root.file[index])
+        #cv2.imshow('before', image)
+        string = root.file[index]
+        print('root file = ' + string)
 
-    # Validasi kemiringan gambar dokumen
-    output_image = preprocess_skewed(image, denoised)
-    cv2.imshow('after', output_image)
+        # Validasi untuk denoise
+        total_noise = count_noise(image)
+        print("Total Noise = " + str(total_noise))
+        denoised = 0
+        if(total_noise > 250):
+            image = preprocessing_denoise(image)
+            denoised = 1
 
-    # Validasi untuk autocropped dokumen 
-    output_image = preprocess_autocropped(output_image)
-    cv2.imshow('after cropped', output_image)
-    save_file_name = 'Preprocessed_Result/' + file_name + '_result' + extension
-    print(save_file_name)
-    cv2.imwrite(save_file_name, output_image)
-    cv2.waitKey(0)
+        # Validasi kemiringan gambar dokumen
+        output_image = preprocess_skewed(image, denoised)
+        #cv2.imshow('after', output_image)
+
+        # Preprocess upscaling images
+        sr2 = cv2.dnn_superres.DnnSuperResImpl_create()
+        path2 = "ESPCN_x4.pb"
+        sr2.readModel(path2)
+        sr2.setModel("espcn", 4)
+        result2 = sr2.upsample(output_image)
+        scale_percent = 50
+        width = int(result2.shape[1] * scale_percent / 100)
+        height = int(result2.shape[0] * scale_percent / 100)
+        dim = (width, height)
+        resized = cv2.resize(output_image, dim, interpolation = cv2.INTER_AREA)
+        result2 = resized
+        #result2 = output_image
+
+        # Validasi untuk pengecekan ulang apakah gambar tersebut upside down atau tidak
+        # osd = int(re.search('(?<=Rotate: )\d+', pytesseract.image_to_osd(string,config='--psm 0 -c min_characters_to_try=5')).group(0))
+        # print("sudut file " + file_name + " = " + str(osd))
+
+        # Menyimpan file temp 1
+        save_file_name = 'temp1/' + file_name + '_result' + extension
+        print(save_file_name)
+        cv2.imwrite(save_file_name, result2)
+
+        #image_copy = output_image.copy()
+        
+        #output_image = check_orientation_layout(image_copy, osd)
+        
+        thresh_rot = cv2.threshold(result2, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+        #cv2.imshow('thresh rot', thresh_rot)
+        #cv2.waitKey(0)
+        white_coords_rot = np.column_stack(np.where(thresh_rot < 50))
+        smallest_coords_height_rot = np.amin(white_coords_rot[:,0])
+        smallest_coords_height_str_rot = str(smallest_coords_height_rot)
+        print("\nSmallest white coordinate height = " + smallest_coords_height_str_rot)
+
+        largest_coords_height_rot = np.amax(white_coords_rot[:,0])
+        largest_coords_height_str_rot = str(largest_coords_height_rot)
+        print("\nLargest white coordinates height = " + largest_coords_height_str_rot)
+
+        smallest_coords_width_rot = np.amin(white_coords_rot[:,1])
+        smallest_coords_width_str_rot = str(smallest_coords_width_rot)
+        print("\nSmallest white coordinates width = " + smallest_coords_width_str_rot)
+
+        largest_coords_width_rot = np.amax(white_coords_rot[:,1])
+        largest_coords_width_str_rot = str(largest_coords_width_rot)
+        print("\nLargest white coordinates width = " + largest_coords_width_str_rot)
+
+        cropped_image = result2[(smallest_coords_height_rot):(largest_coords_height_rot), (smallest_coords_width_rot):(largest_coords_width_rot)]
+        '''if smallest_coords_height_rot <= 1:
+            cropped_image = result2[(smallest_coords_height_rot):(largest_coords_height_rot + 5), (smallest_coords_width_rot - 5):(largest_coords_width_rot + 5)]
+        else:
+            cropped_image = result2[(smallest_coords_height_rot - 5):(largest_coords_height_rot + 5), (smallest_coords_width_rot - 5):(largest_coords_width_rot + 5)]'''
+        
+        # Menyimpan file temp 2
+        save_file_name = 'temp2/' + file_name + '_result' + extension
+        cv2.imwrite(save_file_name, cropped_image)
+
+        # Preprocess upside down image and orientation layout (portrait, landscape)
+        angle_rotate = int(re.search('(?<=Rotate: )\d+', pytesseract.image_to_osd(save_file_name,config='--psm 0 -c min_characters_to_try=5')).group(0))
+        print("sudut file " + file_name + " = " + str(angle_rotate))
+        output_image = check_orientation_layout(cropped_image, angle_rotate)
+
+        # Menyimpan file terakhir
+        save_file_name = 'Preprocessed_Result/' + file_name + '_result' + extension
+        cv2.imwrite(save_file_name, output_image)
+        '''if(angle_rotate == 180):
+            image_upside_down = cv2.imread(save_file_name)
+            output_image = rotate_upside_down(image_upside_down)
+            #cv2.imshow('test upside down', output_image)
+            
+            # Validasi untuk autocropped dokumen 
+            #output_image = preprocess_autocropped(output_image)
+            #cv2.imshow('after cropped', cropped)
+            cv2.imwrite(save_file_name, output_image)
+        else:
+            #output_image = preprocess_autocropped(output_image)
+            #cv2.imshow('after cropped', output_image)
+            cv2.imwrite(save_file_name, output_image)'''
+        
+        iterate = iterate + 1
+
+    if iterate > 0:
+        print("\nPreprocessing Successful")
 
 #================================================================================Tkinter Menu============================================================================#
 # Menubar
@@ -720,15 +732,11 @@ denoise.add_cascade(label="gaussian", command=denoise_gaussian)
 # Submenu of Preprocessmenu
 preprocessmenu.add_cascade(label="Start preprocessing image", command=start_preprocessing)
 preprocessmenu.add_cascade(label="Photos", command=preprocess_photos)
-preprocessmenu.add_cascade(label="Deskew Image", command=deSkew)
 preprocessmenu.add_cascade(label="Denoise", menu=denoise)
 
 # Submenu of add noise
 addnoise.add_cascade(label="Salt and Pepper", command=salt_and_pepper)
 addnoise.add_cascade(label="Gaussian Noise", command=gaussian_noise)
-addnoise.add_cascade(label="Poisson", command=Poisson)
-addnoise.add_cascade(label="Speckle", command=speckle)
-addnoise.add_cascade(label="detect noise", command=detect_noise)
 
 # Submenu of edge detection
 edgedetection.add_cascade(label="Canny", command=canny)
